@@ -5,62 +5,64 @@
 
 const context = cast.framework.CastReceiverContext.getInstance();
 const playerManager = context.getPlayerManager();
-const playbackConfig = new cast.framework.PlaybackConfig();
+
+// Store custom data globally for use in request handlers
+let currentCustomData = null;
 
 // Configure player for HLS with custom headers
-playbackConfig.manifestRequestHandler = (requestInfo) => {
-    console.log('[Receiver] Manifest request:', requestInfo.url);
-    
-    // Add custom headers from media metadata
-    if (requestInfo.content && requestInfo.content.customData) {
-        const customData = requestInfo.content.customData;
-        
-        if (customData.userid) {
-            requestInfo.headers = requestInfo.headers || {};
-            requestInfo.headers['userid'] = customData.userid;
-            console.log('[Receiver] Added userid header:', customData.userid);
-        }
-        
-        if (customData.authinfo) {
-            requestInfo.headers = requestInfo.headers || {};
-            requestInfo.headers['authinfo'] = customData.authinfo;
-            console.log('[Receiver] Added authinfo header');
-        }
-        
-        if (customData.usersessionid) {
-            requestInfo.headers = requestInfo.headers || {};
-            requestInfo.headers['usersessionid'] = customData.usersessionid;
-            console.log('[Receiver] Added usersessionid header');
-        }
-    }
-    
-    return requestInfo;
-};
+playerManager.setManifestHandler((manifest) => {
+    console.log('[Receiver] Manifest handler called');
+    return manifest;
+});
 
-// Handle segment requests (video chunks)
-playbackConfig.segmentRequestHandler = (requestInfo) => {
-    // Add custom headers to segment requests too
-    if (requestInfo.content && requestInfo.content.customData) {
-        const customData = requestInfo.content.customData;
-        
-        requestInfo.headers = requestInfo.headers || {};
-        
-        if (customData.userid) {
-            requestInfo.headers['userid'] = customData.userid;
-        }
-        if (customData.authinfo) {
-            requestInfo.headers['authinfo'] = customData.authinfo;
-        }
-        if (customData.usersessionid) {
-            requestInfo.headers['usersessionid'] = customData.usersessionid;
-        }
-    }
+playerManager.setMediaPlaybackInfoHandler((loadRequest, playbackConfig) => {
+    console.log('[Receiver] Setting up playback config');
     
-    return requestInfo;
-};
-
-// Set playback config
-context.setPlaybackConfig(playbackConfig);
+    // Configure manifest request handler
+    playbackConfig.manifestRequestHandler = (requestInfo) => {
+        console.log('[Receiver] Manifest request:', requestInfo.url);
+        
+        if (currentCustomData) {
+            requestInfo.headers = requestInfo.headers || {};
+            
+            if (currentCustomData.userid) {
+                requestInfo.headers['userid'] = currentCustomData.userid;
+                console.log('[Receiver] Added userid header:', currentCustomData.userid);
+            }
+            if (currentCustomData.authinfo) {
+                requestInfo.headers['authinfo'] = currentCustomData.authinfo;
+                console.log('[Receiver] Added authinfo header');
+            }
+            if (currentCustomData.usersessionid) {
+                requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
+                console.log('[Receiver] Added usersessionid header');
+            }
+        }
+        
+        return requestInfo;
+    };
+    
+    // Configure segment request handler
+    playbackConfig.segmentRequestHandler = (requestInfo) => {
+        if (currentCustomData) {
+            requestInfo.headers = requestInfo.headers || {};
+            
+            if (currentCustomData.userid) {
+                requestInfo.headers['userid'] = currentCustomData.userid;
+            }
+            if (currentCustomData.authinfo) {
+                requestInfo.headers['authinfo'] = currentCustomData.authinfo;
+            }
+            if (currentCustomData.usersessionid) {
+                requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
+            }
+        }
+        
+        return requestInfo;
+    };
+    
+    return playbackConfig;
+});
 
 // Handle LOAD interceptor to extract custom data
 playerManager.setMessageInterceptor(
@@ -72,12 +74,14 @@ playerManager.setMessageInterceptor(
         if (loadRequestData.media.customData) {
             console.log('[Receiver] Custom data:', loadRequestData.media.customData);
             
-            // Store custom data for later use
-            loadRequestData.media.customData = {
+            // Store custom data globally for use in request handlers
+            currentCustomData = {
                 userid: loadRequestData.media.customData.userid,
                 authinfo: loadRequestData.media.customData.authinfo,
                 usersessionid: loadRequestData.media.customData.usersessionid
             };
+            
+            console.log('[Receiver] Stored custom data for request handlers');
         }
         
         // Hide splash screen
