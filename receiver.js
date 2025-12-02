@@ -9,62 +9,7 @@ const playerManager = context.getPlayerManager();
 // Store custom data globally for use in request handlers
 let currentCustomData = null;
 
-// Configure player for HLS with custom headers
-playerManager.setManifestHandler((manifest) => {
-    console.log('[Receiver] Manifest handler called');
-    return manifest;
-});
-
-playerManager.setMediaPlaybackInfoHandler((loadRequest, playbackConfig) => {
-    console.log('[Receiver] Setting up playback config');
-    
-    // Configure manifest request handler
-    playbackConfig.manifestRequestHandler = (requestInfo) => {
-        console.log('[Receiver] Manifest request:', requestInfo.url);
-        
-        if (currentCustomData) {
-            requestInfo.headers = requestInfo.headers || {};
-            
-            if (currentCustomData.userid) {
-                requestInfo.headers['userid'] = currentCustomData.userid;
-                console.log('[Receiver] Added userid header:', currentCustomData.userid);
-            }
-            if (currentCustomData.authinfo) {
-                requestInfo.headers['authinfo'] = currentCustomData.authinfo;
-                console.log('[Receiver] Added authinfo header');
-            }
-            if (currentCustomData.usersessionid) {
-                requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
-                console.log('[Receiver] Added usersessionid header');
-            }
-        }
-        
-        return requestInfo;
-    };
-    
-    // Configure segment request handler
-    playbackConfig.segmentRequestHandler = (requestInfo) => {
-        if (currentCustomData) {
-            requestInfo.headers = requestInfo.headers || {};
-            
-            if (currentCustomData.userid) {
-                requestInfo.headers['userid'] = currentCustomData.userid;
-            }
-            if (currentCustomData.authinfo) {
-                requestInfo.headers['authinfo'] = currentCustomData.authinfo;
-            }
-            if (currentCustomData.usersessionid) {
-                requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
-            }
-        }
-        
-        return requestInfo;
-    };
-    
-    return playbackConfig;
-});
-
-// Handle LOAD interceptor to extract custom data
+// Intercept network requests to add custom headers
 playerManager.setMessageInterceptor(
     cast.framework.messages.MessageType.LOAD,
     (loadRequestData) => {
@@ -74,7 +19,7 @@ playerManager.setMessageInterceptor(
         if (loadRequestData.media.customData) {
             console.log('[Receiver] Custom data:', loadRequestData.media.customData);
             
-            // Store custom data globally for use in request handlers
+            // Store custom data globally
             currentCustomData = {
                 userid: loadRequestData.media.customData.userid,
                 authinfo: loadRequestData.media.customData.authinfo,
@@ -95,6 +40,52 @@ playerManager.setMessageInterceptor(
         return loadRequestData;
     }
 );
+
+// Intercept manifest requests to add authentication headers
+const playbackConfig = playerManager.getPlaybackConfig();
+playbackConfig.manifestRequestHandler = (requestInfo) => {
+    console.log('[Receiver] Manifest request:', requestInfo.url);
+    
+    if (currentCustomData) {
+        requestInfo.headers = requestInfo.headers || {};
+        
+        if (currentCustomData.userid) {
+            requestInfo.headers['userid'] = currentCustomData.userid;
+            console.log('[Receiver] Added userid header:', currentCustomData.userid);
+        }
+        if (currentCustomData.authinfo) {
+            requestInfo.headers['authinfo'] = currentCustomData.authinfo;
+            console.log('[Receiver] Added authinfo header');
+        }
+        if (currentCustomData.usersessionid) {
+            requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
+            console.log('[Receiver] Added usersessionid header');
+        }
+    }
+    
+    return requestInfo;
+};
+
+// Intercept segment requests to add authentication headers
+playbackConfig.segmentRequestHandler = (requestInfo) => {
+    if (currentCustomData) {
+        requestInfo.headers = requestInfo.headers || {};
+        
+        if (currentCustomData.userid) {
+            requestInfo.headers['userid'] = currentCustomData.userid;
+        }
+        if (currentCustomData.authinfo) {
+            requestInfo.headers['authinfo'] = currentCustomData.authinfo;
+        }
+        if (currentCustomData.usersessionid) {
+            requestInfo.headers['usersessionid'] = currentCustomData.usersessionid;
+        }
+    }
+    
+    return requestInfo;
+};
+
+playerManager.setPlaybackConfig(playbackConfig);
 
 // Player event listeners
 playerManager.addEventListener(
