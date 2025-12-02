@@ -41,8 +41,10 @@ playerManager.setMessageInterceptor(
     }
 );
 
+// Configure playback to add authentication headers
+const playbackConfig = new cast.framework.PlaybackConfig();
+
 // Intercept manifest requests to add authentication headers
-const playbackConfig = playerManager.getPlaybackConfig();
 playbackConfig.manifestRequestHandler = (requestInfo) => {
     console.log('[Receiver] Manifest request:', requestInfo.url);
     
